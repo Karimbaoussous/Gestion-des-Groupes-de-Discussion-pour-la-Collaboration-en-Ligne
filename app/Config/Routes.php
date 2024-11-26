@@ -26,10 +26,15 @@ $routes->get('/',function (){
     return redirect()->to('/login');
 });
 
+//for home page
+$routes->get('home', 'AccueilController::index');
+
+
 
 $routes->get('login/', [Login::class, "index"]);
 $routes->post('login/validation', [Login::class, "validation"]);
 $routes->get('logout/', [Login::class, "logout"]);
+
 
 
 $routes->get('forgot/', to: [ForgotPassword::class, "index"]);
