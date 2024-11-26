@@ -9,6 +9,11 @@
     class GroupModel extends Model {
 
         public $userID, $userModel;
+          protected $table      = 'group';
+    protected $primaryKey = 'id';
+    protected $useAutoIncrement = true;
+    protected $allowedFields = ['image', 'title', 'description', 'datetime_created', 'type', 'theme', 'admin_id'];
+
 
         public function __construct(){
 
