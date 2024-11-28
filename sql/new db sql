@@ -1,0 +1,134 @@
+CREATE DATABASE IF NOT EXISTS groupCollab;
+
+USE groupCollab;
+
+-- Create user table
+CREATE TABLE IF NOT EXISTS user (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    googleID VARCHAR(255) UNIQUE,  -- Changed nvarchar to varchar
+    fname VARCHAR(50),
+    lname VARCHAR(50),
+    born DATE,
+    email VARCHAR(100) UNIQUE,  -- Changed nvarchar to varchar
+    contactEmail VARCHAR(100),
+    password VARCHAR(255),
+    username VARCHAR(100) UNIQUE,
+    phone VARCHAR(15),
+    about TEXT,
+    image MEDIUMBLOB,
+    status BOOLEAN,
+    link1 VARCHAR(255),
+    link2 VARCHAR(255),
+    link3 VARCHAR(255),
+    link4 VARCHAR(255)
+);
+
+-- Insert sample users to avoid foreign key violation
+INSERT INTO user (googleID, fname, lname, email, contactEmail, password, username, phone)
+VALUES 
+('googleid1', 'John', 'Doe', 'john.doe@example.com', 'contact1@example.com', 'password1', 'johndoe', '1234567890'),
+('googleid2', 'Jane', 'Smith', 'jane.smith@example.com', 'contact2@example.com', 'password2', 'janesmith', '0987654321'),
+('googleid3', 'Alice', 'Johnson', 'alice.johnson@example.com', 'contact3@example.com', 'password3', 'alicejohnson', '1122334455');
+
+-- Create msg table
+CREATE TABLE IF NOT EXISTS msg (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    body MEDIUMTEXT
+);
+
+-- Create grp table
+CREATE TABLE IF NOT EXISTS grp (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(100) UNIQUE,
+    image MEDIUMBLOB,
+    description TEXT,
+    creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- Changed to TIMESTAMP
+    isPublic BOOLEAN
+);
+
+-- Create send table
+CREATE TABLE IF NOT EXISTS send (
+    user INT,
+    msg INT,
+    grp INT,
+    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- Changed to TIMESTAMP
+    PRIMARY KEY(user, msg, grp),
+    FOREIGN KEY (user) REFERENCES user(id),
+    FOREIGN KEY (msg) REFERENCES msg(id),
+    FOREIGN KEY (grp) REFERENCES grp(id)
+);
+
+-- Create joinGroup table
+CREATE TABLE IF NOT EXISTS joinGroup (
+    grp INT,
+    user INT,
+    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- Changed to TIMESTAMP
+    method VARCHAR(255),
+    PRIMARY KEY(grp, user),
+    FOREIGN KEY (grp) REFERENCES grp(id),
+    FOREIGN KEY (user) REFERENCES user(id)
+);
+
+-- Create created table
+CREATE TABLE IF NOT EXISTS created (
+    user INT,
+    grp INT,
+    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- Changed to TIMESTAMP
+    PRIMARY KEY(user, grp),
+    FOREIGN KEY (user) REFERENCES user(id),
+    FOREIGN KEY (grp) REFERENCES grp(id)
+);
+
+-- Insert sample groups
+INSERT INTO grp (title, description, isPublic) 
+VALUES ("hackers", "Hi!", FALSE), 
+       ("gamers", "Hi!", TRUE), 
+       ("singers", "Hi!", TRUE);
+
+-- Update group images (ensure user records exist first)
+UPDATE grp 
+SET image = (SELECT image FROM user WHERE id = 1) 
+WHERE id = 1;
+UPDATE grp 
+SET image = (SELECT image FROM user WHERE id = 2) 
+WHERE id = 2;
+UPDATE grp 
+SET image = (SELECT image FROM user WHERE id = 3) 
+WHERE id = 3;
+
+-- Insert data into created and joinGroup tables (with existing users)
+INSERT INTO created (user, grp) 
+VALUES (1, 1), (2, 2), (2, 3);
+
+INSERT INTO joinGroup (user, grp) 
+VALUES (1, 1), (2, 2), (2, 3);
+
+-- Join the private group, only if not already a member
+INSERT INTO joinGroup (user, grp) 
+SELECT 1, (SELECT id FROM grp WHERE isPublic = FALSE)
+WHERE NOT EXISTS (
+    SELECT 1 FROM joinGroup WHERE user = 1 AND grp = (SELECT id FROM grp WHERE isPublic = FALSE)
+);
+
+-- Trigger to prevent multiple group creators
+DELIMITER $$
+
+CREATE TRIGGER prevent_multiple_group_creators
+BEFORE INSERT ON created
+FOR EACH ROW
+BEGIN
+    DECLARE group_exists INT;
+
+    -- Check if the group already exists for any user
+    SELECT COUNT(*) INTO group_exists
+    FROM created
+    WHERE grp = NEW.grp;
+
+    -- If the group already exists, raise an error
+    IF group_exists > 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'This group is already created by another user.';
+    END IF;
+END$$
+
+DELIMITER ;
